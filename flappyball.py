@@ -4,6 +4,7 @@ from tensorflow import keras
 import time
 import multiprocessing as mp
 import numpy as np
+from copy import deepcopy
 
 pygame.init()
 clock = pygame.time.Clock()
@@ -58,7 +59,7 @@ def my_model():
 
 # fitness function
 def fitness_bird(bird):
-    fitness = bird.score ** 2
+    fitness = deepcopy(bird.score) ** 2
     return fitness
 
 
@@ -121,7 +122,7 @@ popul = Population(
     Agent_class=Bird,
     keras_functional_model=build_model,
     fitness_function=fitness_bird,
-    population_size=4,
+    population_size=10,
 )
 
 # Pipes
