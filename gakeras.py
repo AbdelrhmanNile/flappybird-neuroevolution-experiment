@@ -108,6 +108,8 @@ class Population:
             raise ValueError("Invalid evolve method")
         self._evolve_methods[method](crossover_rate, mutation_rate)
         self.generations += 1
+        print(f"Generation: {self.generations}")
+        print(f"Best agent: {self.best_agent.score}")
 
     def _evolve_co(self, crossover_rate, mutation_rate):
         fitness = []

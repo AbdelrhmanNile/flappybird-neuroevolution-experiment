@@ -121,7 +121,7 @@ popul = Population(
     Agent_class=Bird,
     keras_functional_model=build_model,
     fitness_function=fitness_bird,
-    population_size=20,
+    population_size=5,
 )
 
 # Pipes
