@@ -14,10 +14,10 @@ class Brain:
     def predict(self, x):
         return self.model.predict(x, verbose=0)
 
-    def crossover(self, individual, crossover_rate, mutation_rate):
+    def crossover(self, agent, crossover_rate, mutation_rate):
         child = Brain(model=deepcopy(self.model))
         child_weights = deepcopy(child.model.get_weights())
-        parent2_weights = deepcopy(individual.brain.model.get_weights())
+        parent2_weights = deepcopy(agent.brain.model.get_weights())
         for i in range(len(child_weights)):
             for j in range(len(child_weights[i])):
                 if type(child_weights[i][j]) == np.ndarray:
@@ -49,11 +49,11 @@ class Brain:
         child.model.set_weights(child_weights)
         return child
 
-    # crossover by multiplying weights
-    def crossover_mw(self, individual, crossover_rate, mutation_rate):
+    # crossover by multiplying weights elementwise
+    def crossover_mw(self, agent, crossover_rate, mutation_rate):
         child = Brain(deepcopy(self.model))
         child_weights = deepcopy(child.model.get_weights())
-        parent2_weights = deepcopy(individual.model.get_weights())
+        parent2_weights = deepcopy(agent.model.get_weights())
         for i in range(len(child_weights)):
             for j in range(len(child_weights[i])):
                 if type(child_weights[i][j]) == np.ndarray:
@@ -78,86 +78,100 @@ class Brain:
 class Population:
     def __init__(
         self,
-        Individual_class,
+        Agent_class,
         keras_functional_model,
         fitness_function,
         population_size,
     ):
         self.population = []
         self.generations = 0
-        self.best_individual = None
+        self.best_Agent = None
         self.fitness_function = fitness_function
-        self.Individual_class = Individual_class
+        self.Agent_class = Agent_class
         for i in range(population_size):
-            self.population.append(self.Individual_class(Brain(keras_functional_model)))
+            self.population.append(self.Agent_class(Brain(keras_functional_model)))
 
-    def evolve(self, crossover_rate, mutation_rate):
+        self._evolve_methods = {
+            "crossover": self._evolve_co,
+            "crossover_mulwei": self._evolve_mw,
+            "copy": self._evolve_copy,
+        }
+
+    def evolve(self, method, crossover_rate, mutation_rate=0.1):
+        """Evolve the population
+        Available methods:
+            - crossover: crossover weights of two parents
+            - crossover_mulwei: crossover weights of two parents by multiplying elementwise
+            - copy: copy weights of a parent and mutate them
+        """
+        if method not in self._evolve_methods.keys():
+            raise ValueError("Invalid evolve method")
+        self._evolve_methods[method](crossover_rate, mutation_rate)
+        self.generations += 1
+
+    def _evolve_co(self, crossover_rate, mutation_rate):
         fitness = []
-        for individual in self.population:
-            fitness.append(self.fitness_function(individual))
+        for agent in self.population:
+            fitness.append(self.fitness_function(agent))
         fitness = np.array(fitness)
         fitness = fitness / np.sum(fitness)
-        self.best_individual = self.population[np.argmax(fitness)]
+        self.best_agent = self.population[np.argmax(fitness)]
         new_population = []
         for i in range(len(self.population)):
             parent1 = np.random.choice(self.population, p=fitness)
             parent2 = np.random.choice(self.population, p=fitness)
             new_population.append(
-                self.Individual_class(
+                self.Agent_class(
                     parent1.brain.crossover(parent2, crossover_rate, mutation_rate)
                 )
             )
         self.population = new_population
-        self.generations += 1
-        print(f"generation {self.generations}")
-        print(f"best score {self.best_individual.score}")
 
-    def evolve_mw(self, crossover_rate, mutation_rate):
+    def _evolve_mw(self, crossover_rate, mutation_rate):
         fitness = []
-        for individual in self.population:
-            fitness.append(self.fitness_function(individual))
+        for agent in self.population:
+            fitness.append(self.fitness_function(agent))
         fitness = np.array(fitness)
         fitness = fitness / np.sum(fitness)
-        self.best_individual = self.population[np.argmax(fitness)]
+        self.best_agent = self.population[np.argmax(fitness)]
         new_population = []
         for i in range(len(self.population)):
             parent1 = np.random.choice(self.population, p=fitness)
             parent2 = np.random.choice(self.population, p=fitness)
             new_population.append(
-                parent1.crossover_mw(parent2, crossover_rate, mutation_rate)
+                self.Agent_class(
+                    parent1.crossover_mw(parent2, crossover_rate, mutation_rate)
+                )
             )
         self.population = new_population
 
-    def evolve_copy(self, mutation_rate):
+    def _evolve_copy(self, mutation_rate):
         fitness = []
-        for individual in self.population:
-            fitness.append(self.fitness_function(individual))
+        for agent in self.population:
+            fitness.append(self.fitness_function(agent))
         fitness = np.array(fitness)
         fitness = fitness / np.sum(fitness)
-        self.best_individual = self.population[np.argmax(fitness)]
+        self.best_agent = self.population[np.argmax(fitness)]
         new_population = []
         for i in range(len(self.population)):
-            # parent1 = np.random.choice(self.population, p=fitness)
-            parent1 = self.population[i]
-            new_population.append(
-                self.Individual_class(parent1.brain.copy(mutation_rate))
-            )
+            parent1 = np.random.choice(self.population, p=fitness)
+            new_population.append(self.Agent_class(parent1.brain.copy(mutation_rate)))
         self.population = new_population
 
-    def get_best_individual(self):
-        return self.best_individual
+    def get_best_agent(self):
+        return self.best_agent
 
     def get_population(self):
         return self.population
 
     def all_dead(self):
-        for individual in self.population:
-            if not individual.dead:
+        for agent in self.population:
+            if not agent.dead:
                 return False
         return True
 
 
-class Individual:
+class Agent:
     def __init__(self, brain):
         self.score = 0.01
         self.brain = brain

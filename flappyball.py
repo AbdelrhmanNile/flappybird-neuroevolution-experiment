@@ -1,5 +1,5 @@
 import pygame, random
-from gakeras import Brain, Population, Individual
+from gakeras import Brain, Population, Agent
 from tensorflow import keras
 import time
 import multiprocessing as mp
@@ -63,7 +63,7 @@ def fitness_bird(bird):
 
 
 # agent class
-class Bird(Individual):
+class Bird(Agent):
     def __init__(self, brain):
         super().__init__(brain)
         self.shape = pygame.Rect(100, HEIGHT / 2 - 15, 30, 30)
@@ -118,7 +118,7 @@ class Bird(Individual):
 
 
 popul = Population(
-    Individual_class=Bird,
+    Agent_class=Bird,
     keras_functional_model=build_model,
     fitness_function=fitness_bird,
     population_size=20,
@@ -159,22 +159,26 @@ def start_game():
         if counter % 70 == 0:
             pipe1, pipe2 = generate_pipes()
             pipes.append([pipe1, pipe2])
-        for bird in pool.population:
+        for bird in popul.population:
             bird.move()
             # model inference and decision making happens here
             bird.think(pipes)
         screen.fill(BG)
-        for bird in pool.population:
+        for bird in popul.population:
             bird.draw()
         for pipe_pair in pipes:
             for pipe in pipe_pair:
                 pygame.draw.rect(screen, ACC_COLOR, pipe)
                 pipe.x -= 3
-                for bird in pool.population:
+                for bird in popul.population:
                     if pipe.colliderect(bird.shape):
                         bird.dead = True
-                        if pool.all_dead():
-                            pool.evolve(0.5, 0.1)
+                        if popul.all_dead():
+                            popul.evolve(
+                                method="crossover",
+                                crossover_rate=0.5,
+                                mutation_rate=0.1,
+                            )
                             start_game()
                     elif (
                         pipe_pair[0].x < bird.shape.x and pipe_pair[1].x < bird.shape.x
