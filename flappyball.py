@@ -121,7 +121,7 @@ popul = Population(
     Agent_class=Bird,
     keras_functional_model=build_model,
     fitness_function=fitness_bird,
-    population_size=5,
+    population_size=4,
 )
 
 # Pipes
@@ -175,18 +175,23 @@ def start_game():
                         bird.dead = True
                         if popul.all_dead():
                             popul.evolve(
-                                method="crossover",
+                                method="copy",
                                 crossover_rate=0.5,
-                                mutation_rate=0.1,
+                                mutation_rate=0.001,
+                                elitism_rate=0.2,
                             )
                             start_game()
                     elif (
                         pipe_pair[0].x < bird.shape.x and pipe_pair[1].x < bird.shape.x
                     ):
                         bird.reward()
+                        try:
+                            pipes.pop(0)
+                        except:
+                            pass
 
-                    if pipe_pair[0].x < bird.shape.x:
-                        pipes.pop(0)
+                    #if pipe_pair[0].x < bird.shape.x:
+                        #pipes.pop(0)
         pygame.display.update()
         clock.tick(60)
 

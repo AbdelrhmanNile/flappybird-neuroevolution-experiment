@@ -2,7 +2,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import numpy as np
 from copy import deepcopy
-
+from tensorflow.keras.models import clone_model
 
 class Brain:
     def __init__(self, keras_functional_model=None, model=None):
@@ -15,7 +15,7 @@ class Brain:
         return self.model.predict(x, verbose=0)
 
     def crossover(self, agent, crossover_rate, mutation_rate):
-        child = Brain(model=deepcopy(self.model))
+        child = Brain(model=clone_model(self.model))
         child_weights = deepcopy(child.model.get_weights())
         parent2_weights = deepcopy(agent.brain.model.get_weights())
         for i in range(len(child_weights)):
@@ -23,19 +23,19 @@ class Brain:
                 if type(child_weights[i][j]) == np.ndarray:
                     for k in range(len(child_weights[i][j])):
                         if np.random.random() < crossover_rate:
-                            child_weights[i][j][k] = parent2_weights[i][j][k]
+                            child_weights[i][j][k] = deepcopy(parent2_weights[i][j][k])
                         if np.random.random() < mutation_rate:
                             child_weights[i][j][k] += np.random.normal(0, 1)
                 else:
                     if np.random.random() < crossover_rate:
-                        child_weights[i][j] = parent2_weights[i][j]
+                        child_weights[i][j] = deepcopy(parent2_weights[i][j])
                     if np.random.random() < mutation_rate:
                         child_weights[i][j] += np.random.normal(0, 1)
         child.model.set_weights(child_weights)
         return child
 
     def copy(self, mutation_rate):
-        child = Brain(model=deepcopy(self.model))
+        child = Brain(model=clone_model(self.model))
         child_weights = deepcopy(child.model.get_weights())
         for i in range(len(child_weights)):
             for j in range(len(child_weights[i])):
@@ -51,9 +51,9 @@ class Brain:
 
     # crossover by multiplying weights elementwise
     def crossover_mw(self, agent, crossover_rate, mutation_rate):
-        child = Brain(deepcopy(self.model))
+        child = Brain(model=clone_model(self.model))
         child_weights = deepcopy(child.model.get_weights())
-        parent2_weights = deepcopy(agent.model.get_weights())
+        parent2_weights = deepcopy(agent.brain.model.get_weights())
         for i in range(len(child_weights)):
             for j in range(len(child_weights[i])):
                 if type(child_weights[i][j]) == np.ndarray:
@@ -97,7 +97,7 @@ class Population:
             "copy": self._evolve_copy,
         }
 
-    def evolve(self, method, crossover_rate, mutation_rate=0.1):
+    def evolve(self, method, crossover_rate=None, mutation_rate=0.1, elitism_rate=0.1):
         """Evolve the population
         Available methods:
             - crossover: crossover weights of two parents
@@ -106,20 +106,27 @@ class Population:
         """
         if method not in self._evolve_methods.keys():
             raise ValueError("Invalid evolve method")
-        self._evolve_methods[method](crossover_rate, mutation_rate)
+        self._evolve_methods[method](
+            crossover_rate=crossover_rate, mutation_rate=mutation_rate, elitism_rate=elitism_rate
+        )
         self.generations += 1
         print(f"Generation: {self.generations}")
-        print(f"Best agent: {self.best_agent.score}")
+        print(f"Best agent score: {self.best_agent.score}")
 
-    def _evolve_co(self, crossover_rate, mutation_rate):
+    def _evolve_co(self, crossover_rate, mutation_rate, elitism_rate):
         fitness = []
         for agent in self.population:
             fitness.append(self.fitness_function(agent))
         fitness = np.array(fitness)
         fitness = fitness / np.sum(fitness)
-        self.best_agent = self.population[np.argmax(fitness)]
+        #print(fitness)
+        self.best_agent = deepcopy(self.population[np.argmax(fitness)])
         new_population = []
         for i in range(len(self.population)):
+            if np.random.random() < elitism_rate:
+                new_population.append(deepcopy(self.best_agent))
+                new_population[-1].score = 0.01
+                continue
             parent1 = np.random.choice(self.population, p=fitness)
             parent2 = np.random.choice(self.population, p=fitness)
             new_population.append(
@@ -127,44 +134,57 @@ class Population:
                     parent1.brain.crossover(parent2, crossover_rate, mutation_rate)
                 )
             )
-        self.population = new_population
+        self.population.clear()
+        self.population = deepcopy(new_population)
+        new_population.clear()
+        del new_population, fitness
 
-    def _evolve_mw(self, crossover_rate, mutation_rate):
+    def _evolve_mw(self, crossover_rate, mutation_rate, elitism_rate):
         fitness = []
         for agent in self.population:
             fitness.append(self.fitness_function(agent))
         fitness = np.array(fitness)
         fitness = fitness / np.sum(fitness)
-        self.best_agent = self.population[np.argmax(fitness)]
+        self.best_agent = deepcopy(self.population[np.argmax(fitness)])
         new_population = []
         for i in range(len(self.population)):
+            if np.random.random() < elitism_rate:
+                new_population.append(deepcopy(self.best_agent))
+                new_population[-1].score = 0.01
+                continue
             parent1 = np.random.choice(self.population, p=fitness)
             parent2 = np.random.choice(self.population, p=fitness)
             new_population.append(
                 self.Agent_class(
-                    parent1.crossover_mw(parent2, crossover_rate, mutation_rate)
+                    parent1.brain.crossover_mw(parent2, crossover_rate, mutation_rate)
                 )
             )
-        self.population = new_population
+        self.population.clear()
+        self.population = deepcopy(new_population)
+        new_population.clear()
+        del new_population, fitness
 
-    def _evolve_copy(self, mutation_rate):
+    def _evolve_copy(self, crossover_rate, mutation_rate, elitism_rate):
         fitness = []
         for agent in self.population:
             fitness.append(self.fitness_function(agent))
         fitness = np.array(fitness)
         fitness = fitness / np.sum(fitness)
-        self.best_agent = self.population[np.argmax(fitness)]
+        self.best_agent = deepcopy(self.population[np.argmax(fitness)])
         new_population = []
         for i in range(len(self.population)):
             parent1 = np.random.choice(self.population, p=fitness)
             new_population.append(self.Agent_class(parent1.brain.copy(mutation_rate)))
-        self.population = new_population
+        self.population.clear()
+        self.population = deepcopy(new_population)
+        new_population.clear()
+        del new_population, fitness
 
     def get_best_agent(self):
-        return self.best_agent
+        return deepcopy(self.best_agent)
 
     def get_population(self):
-        return self.population
+        return deepcopy(self.population)
 
     def all_dead(self):
         for agent in self.population:
