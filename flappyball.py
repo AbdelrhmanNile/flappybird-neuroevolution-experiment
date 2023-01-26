@@ -10,7 +10,7 @@ pygame.init()
 clock = pygame.time.Clock()
 
 # Dimensions of the window
-WIDTH, HEIGHT = 1080, 700
+WIDTH, HEIGHT = 400, 300
 
 # Colors
 BG = (29, 31, 33)
@@ -20,7 +20,7 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 screen.fill(BG)
 g = 0.5  # Gravity
 game_font = pygame.font.Font("freesansbold.ttf", 28)
-
+gens = []
 
 def build_model():
     inputss = keras.layers.Input(shape=[5])
@@ -50,9 +50,9 @@ def build_model():
 def my_model():
     return keras.Sequential(
         [
-            keras.layers.Dense(10, activation="relu", input_shape=[5]),
-            keras.layers.Dense(8, activation="relu"),
-            keras.layers.Dense(1, activation="sigmoid"),
+            keras.layers.Dense(10, activation="relu", input_shape=[5], kernel_initializer="he_uniform", bias_initializer="he_uniform"),
+            keras.layers.Dense(8, activation="relu", kernel_initializer="he_uniform", bias_initializer="he_uniform"),
+            keras.layers.Dense(1, activation="sigmoid", kernel_initializer="glorot_uniform", bias_initializer="glorot_uniform"),
         ]
     )
 
@@ -120,7 +120,7 @@ class Bird(Agent):
 
 popul = Population(
     Agent_class=Bird,
-    keras_functional_model=build_model,
+    keras_functional_model=my_model,
     fitness_function=fitness_bird,
     population_size=10,
 )
@@ -128,8 +128,8 @@ popul = Population(
 # Pipes
 pipes = []
 prev_x = WIDTH
-pipe_height = 200  # The gap between the two pipes
-pipe_vel = 3
+pipe_height = 150  # The gap between the two pipes
+pipe_vel = 5
 pipe_intervals = (
     6000  # Defining the interval at which new pipes will be generated (in milliseconds)
 )
@@ -139,7 +139,7 @@ pygame.time.set_timer(SPAWNPIPE, pipe_intervals)
 
 
 def generate_pipes():
-    x = random.randint(50, 450)
+    x = random.randint(50, 200)
     pipe1 = pygame.Rect(prev_x, 0, 25, x)
     pipe2 = pygame.Rect(
         prev_x, pipe1.bottom + pipe_height, 25, HEIGHT - pipe_height - x
@@ -176,23 +176,19 @@ def start_game():
                         bird.dead = True
                         if popul.all_dead():
                             popul.evolve(
-                                method="copy",
+                                method="crossover",
                                 crossover_rate=0.5,
                                 mutation_rate=0.001,
                                 elitism_rate=0.2,
                             )
                             start_game()
-                    elif (
-                        pipe_pair[0].x < bird.shape.x and pipe_pair[1].x < bird.shape.x
-                    ):
+                    elif (pipe_pair[0].x < bird.shape.x and pipe_pair[1].x < bird.shape.x):
                         bird.reward()
-                        try:
-                            pipes.pop(0)
-                        except:
-                            pass
-
-                    #if pipe_pair[0].x < bird.shape.x:
-                        #pipes.pop(0)
+                        print("reward")
+                    if pipes[0][0].x < 0:
+                        pipes.pop(0)
+                        print("pop")
+                print(pipes)
         pygame.display.update()
         clock.tick(60)
 

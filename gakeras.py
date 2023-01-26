@@ -25,12 +25,12 @@ class Brain:
                         if np.random.random() < crossover_rate:
                             child_weights[i][j][k] = deepcopy(parent2_weights[i][j][k])
                         if np.random.random() < mutation_rate:
-                            child_weights[i][j][k] += np.random.normal(0, 1)
+                            child_weights[i][j][k] += np.random.uniform(-5, 5)
                 else:
                     if np.random.random() < crossover_rate:
                         child_weights[i][j] = deepcopy(parent2_weights[i][j])
                     if np.random.random() < mutation_rate:
-                        child_weights[i][j] += np.random.normal(0, 1)
+                        child_weights[i][j] += np.random.uniform(-5, 5)
         child.model.set_weights(child_weights)
         return child
 
